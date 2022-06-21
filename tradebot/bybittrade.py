@@ -59,7 +59,7 @@ class BybitTrade:
             res = self.session.orderbook(symbol=symbol)
             price = float(res['result'][0]['price'])
         
-        qty = round(amount / price, 3)
+        qty = round(amount / price, 5)
         
         if side == 'Buy':
             sl = price - price * sl_perc/100
@@ -67,8 +67,8 @@ class BybitTrade:
         else:
             sl = price + price * sl_perc/100
             tp = price - price * tp_perc/100
-        sl = round(sl, 3)
-        tp = round(tp, 3)
+        sl = round(sl, 5)
+        tp = round(tp, 5)
                 
         order = {}
         order['symbol'] = symbol
