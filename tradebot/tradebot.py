@@ -71,9 +71,20 @@ def main():
         help="Amount of USDT to be used in a single order including leverage. Default is 100. (i.e amount of 100 USDT with default 10x leverage will use 10 USDT of your derivative account)")
     parser.add_argument('--take_profit', type=int, default=4, help="Take profit in percent from the purchase price. Default is 4.")
     parser.add_argument('--stop_loss', type=int, default=4, help="Stop loss in percent from the purchase price. Default is 4.")
+    parser.add_argument('--close_policy', type=bool, default=False, help="Close active position if new signal shows opposite side (BUY or SELL). Default is False.")
+    parser.add_argument('--open_policy', type=bool, default=False, help="Open new position on opposite side (BUY or SELL) when there is already an active one. Default is False.")
     args = parser.parse_args()
 
-    sess = BybitTrade(args.bybit_api_key, args.bybit_api_secret, amount=args.amount, take_profit=args.take_profit, stop_loss=args.stop_loss)
+    sess = BybitTrade(
+        args.bybit_api_key, 
+        args.bybit_api_secret, 
+        amount=args.amount, 
+        take_profit=args.take_profit, 
+        stop_loss=args.stop_loss,
+        open_policy=args.open_policy,
+        close_policy=args.close_policy,
+    )
+
     listen_telegram(args.telegram_api_id, args.telegram_api_hash, bybit_session=sess, input_channel=args.telegram_channel)
 
 
