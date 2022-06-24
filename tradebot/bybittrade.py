@@ -93,8 +93,9 @@ class BybitTrade:
         sl = sl + 1 if side == 'Buy' else sl - 1
         tp = tp + 1 if side == 'Buy' else tp - 1
         
-        sl = sl / factor
-        tp = tp / factor
+        # Really a hacky workaround to mitigate float representation error in IEEE-754. Propose better. TODO
+        sl = round(sl / factor, 16)
+        tp = round(tp / factor, 16)
                 
         order = {}
         order['symbol'] = symbol
