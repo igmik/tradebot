@@ -1,3 +1,4 @@
+import math
 from pybit import usdt_perpetual
 
 class BybitTrade:
@@ -13,6 +14,15 @@ class BybitTrade:
         self.stop_loss = stop_loss
         self.open_policy = open_policy
         self.close_policy = close_policy
+        self._query_and_set_symbols()
+    
+    def _query_and_set_symbols(self) -> None:
+        res = self.session.query_symbol()
+        self.ticks = {}
+        self.sizes = {}
+        for symbol in res['result']:
+            self.ticks[symbol['name']] = symbol['price_filter']
+            self.sizes[symbol['name']] = symbol['lot_size_filter']
     
     def current_positions(self) -> list:
         result = self.session.my_position()['result']
@@ -64,9 +74,14 @@ class BybitTrade:
             price = target_price
         else:
             res = self.session.orderbook(symbol=symbol)
-            price = float(res['result'][0]['price'])
+            price = float(res['result'][0]['price']) if side == "Buy" else float(res['result'][1]['price'])
         
-        qty = round(amount / price, 5)
+        # Round quantity up to a qty_step
+        #qty = amount / price
+        #factor = 1/float(self.sizes[symbol]['qty_step'])
+        #qty = round(qty*factor) / factor
+        qty = round(amount/price, 5)
+
         
         if side == 'Buy':
             sl = price - price * sl_perc/100
@@ -74,8 +89,20 @@ class BybitTrade:
         else:
             sl = price + price * sl_perc/100
             tp = price - price * tp_perc/100
-        sl = round(sl, 5)
-        tp = round(tp, 5)
+
+        # Round sl/tp up to a tick_size
+        tick_size = float(self.ticks[symbol]['tick_size'])
+        factor = 1 / tick_size
+        sl = math.floor(sl*factor)
+        tp = math.floor(tp*factor)
+
+        # Adjust sl/tp with a single tick_size so that price*sl_perc < sl and tp > price*tp_perc
+        sl = sl + 1 if side == 'Buy' else sl - 1
+        tp = tp + 1 if side == 'Buy' else tp - 1
+        
+        # Really a hacky workaround to mitigate float representation error in IEEE-754. Propose better. TODO
+        sl = round(sl / factor, 16)
+        tp = round(tp / factor, 16)
                 
         order = {}
         order['symbol'] = symbol
