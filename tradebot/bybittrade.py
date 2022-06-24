@@ -2,7 +2,7 @@ import math
 from pybit import usdt_perpetual
 
 class BybitTrade:
-    def __init__(self, api_key, api_secret, amount:int=100, take_profit:int=4, stop_loss:int=4):
+    def __init__(self, api_key, api_secret, amount:int=100, take_profit:int=4, stop_loss:int=4, open_policy:bool=False, close_policy:bool=False):
         self.session = usdt_perpetual.HTTP(
             endpoint='https://api.bybit.com', 
             api_key=api_key,
@@ -12,6 +12,8 @@ class BybitTrade:
         self.amount = amount
         self.take_profit = take_profit
         self.stop_loss = stop_loss
+        self.open_policy = open_policy
+        self.close_policy = close_policy
         self._query_and_set_symbols()
     
     def _query_and_set_symbols(self) -> None:
@@ -36,7 +38,7 @@ class BybitTrade:
                 return pos['side']
         return None
     
-    def create_perp_orders_bulk(self, orders:list, order_type:str='Limit', close_policy:bool=True) -> None:
+    def create_perp_orders_bulk(self, orders:list, order_type:str='Limit') -> None:
         positions = self.current_positions()
         for order in orders:
             symbol = order['symbol']
@@ -48,9 +50,14 @@ class BybitTrade:
                     continue
                 else:
                     print(f"{symbol} is open for {active_side}, but requested for {side}")
-                    if close_policy:
-                        print("Will close first")
+                    if self.close_policy:
+                        print("Close in accordance with close_policy")
                         self.session.close_position(symbol)
+                    if not self.open_policy:
+                        print("Do not open opposite in accordance with open_policy")
+                        continue
+                    print("Open opposite position")
+
             if 'amount' in order:
                 amount = order['amount']
             else:

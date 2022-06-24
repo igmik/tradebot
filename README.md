@@ -34,6 +34,12 @@ options:
                         Take profit in percent from the purchase price. Default is 4.
   --stop_loss STOP_LOSS
                         Stop loss in percent from the purchase price. Default is 4.
+  --close_policy CLOSE_POLICY
+                        Close active position if new signal shows opposite side (BUY or SELL). Default is
+                        False.
+  --open_policy OPEN_POLICY
+                        Open new position on opposite side (BUY or SELL) when there is already an active one.
+                        Default is False.
 ```
 
 To start the bot in the Docker container provide the required arguments to connect to your Telegram account, ByBit exchange and provide Telegram channel ID to listen the sugnals.
@@ -51,12 +57,21 @@ BTCUSDT: [0.50497186 0.49502817] SELL
 Sell order for BTCUSDT is already open
 ```
 
-If the order side is opposite, it will firstly close the current position (`cancel_policy is set to True` by default) and will open the new one:
+If the order side is opposite, it will follow open and close policy.  
+If `close_policy` is set to True (default is False) it will close current position:
 ```
 Received at 2022-06-20 08:00:19+00:00:
 XLMUSDT: [0.50070024 0.49929973] BUY
 XLMUSDT is open for Sell, but requested for Buy
-Will close first
+Close in accordance with close_policy
+```
+
+If `open_policy` is set to False (default is False) it wont open new opposite position:
+```
+Received at 2022-06-20 08:00:17+00:00:
+BTCUSDT: [0.50497186 0.49502817] BUY
+BTCUSDT is open for Sell, but requested for Buy
+Do not open opposite in accordance with open_policy
 ```
 
 In case of an error in any REST API call the current order will be skipped:
