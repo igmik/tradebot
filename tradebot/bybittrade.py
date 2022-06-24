@@ -1,3 +1,4 @@
+import math
 from pybit import usdt_perpetual
 
 class BybitTrade:
@@ -84,13 +85,16 @@ class BybitTrade:
 
         # Round sl/tp up to a tick_size
         tick_size = float(self.ticks[symbol]['tick_size'])
-        factor = 1/tick_size
-        sl = round(sl*factor) / factor
-        tp = round(tp*factor) / factor
+        factor = 1 / tick_size
+        sl = math.floor(sl*factor)
+        tp = math.floor(tp*factor)
 
         # Adjust sl/tp with a single tick_size so that price*sl_perc < sl and tp > price*tp_perc
-        sl = sl - tick_size if side == 'Buy' else sl + tick_size
-        tp = tp + tick_size if side == 'Buy' else tp - tick_size
+        sl = sl + 1 if side == 'Buy' else sl - 1
+        tp = tp + 1 if side == 'Buy' else tp - 1
+        
+        sl = sl / factor
+        tp = tp / factor
                 
         order = {}
         order['symbol'] = symbol
