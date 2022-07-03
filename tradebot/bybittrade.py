@@ -2,7 +2,14 @@ import math
 from pybit import usdt_perpetual
 
 class BybitTrade:
-    def __init__(self, api_key, api_secret, amount:int=100, take_profit:int=4, stop_loss:int=4, open_policy:bool=False, close_policy:bool=False):
+    def __init__(self, api_key, api_secret, approved_symbols:list,
+            leverage:int=1,
+            amount:int=100,
+            take_profit:int=4,
+            stop_loss:int=4,
+            open_policy:bool=False,
+            close_policy:bool=False,
+        ):
         self.session = usdt_perpetual.HTTP(
             endpoint='https://api.bybit.com', 
             api_key=api_key,
@@ -14,15 +21,33 @@ class BybitTrade:
         self.stop_loss = stop_loss
         self.open_policy = open_policy
         self.close_policy = close_policy
-        self._query_and_set_symbols()
+        self._init_symbols(leverage, approved_symbols)
     
-    def _query_and_set_symbols(self) -> None:
+    def _init_symbols(self, leverage:int, approved_symbols:list) -> None:
+        if not approved_symbols:
+            raise ValueError("Approved symbols list is mandatory, got None.")
+
         res = self.session.query_symbol()
         self.ticks = {}
         self.sizes = {}
+        approved_symbols = set(approved_symbols)
         for symbol in res['result']:
+            if symbol['name'] not in approved_symbols:
+                continue
+
             self.ticks[symbol['name']] = symbol['price_filter']
             self.sizes[symbol['name']] = symbol['lot_size_filter']
+
+            try:
+                self.session.set_leverage(
+                    symbol=symbol['name'],
+                    buy_leverage=leverage,
+                    sell_leverage=leverage,
+                )
+            except Exception as e:
+                print(e)
+                print("Skip")
+                pass
     
     def current_positions(self) -> list:
         result = self.session.my_position()['result']
@@ -32,10 +57,10 @@ class BybitTrade:
                 positions.append(pos['data'])
         return positions
     
-    def get_position_side(self, positions:list, symbol:str) -> str:
+    def get_active_position(self, positions:list, symbol:str) -> str:
         for pos in positions:
             if pos['symbol'] == symbol:
-                return pos['side']
+                return pos
         return None
     
     def create_perp_orders_bulk(self, orders:list, order_type:str='Limit') -> None:
@@ -43,20 +68,24 @@ class BybitTrade:
         for order in orders:
             symbol = order['symbol']
             side = order['side']
-            active_side = self.get_position_side(positions, symbol)
-            if active_side:
-                if active_side == side:
-                    print(f"{side} order for {symbol} is already open")
-                    continue
+            position = self.get_active_position(positions, symbol)
+            if position:
+                if position['unrealised_pnl'] > 0.2:
+                    print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
+                    self.session.close_position(symbol)
                 else:
-                    print(f"{symbol} is open for {active_side}, but requested for {side}")
-                    if self.close_policy:
-                        print("Close in accordance with close_policy")
-                        self.session.close_position(symbol)
-                    if not self.open_policy:
-                        print("Do not open opposite in accordance with open_policy")
+                    if position['side'] == side:
+                        print(f"{side} order for {symbol} is already open")
                         continue
-                    print("Open opposite position")
+                    else:
+                        print(f"{symbol} is open for {position['side']}, but requested for {side}")
+                        if self.close_policy:
+                            print("Close in accordance with close_policy")
+                            self.session.close_position(symbol)
+                        if not self.open_policy:
+                            print("Do not open opposite in accordance with open_policy")
+                            continue
+                        print("Open opposite position")
 
             if 'amount' in order:
                 amount = order['amount']

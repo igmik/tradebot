@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 import re
 from telethon.sync import TelegramClient, events
 from bybittrade import BybitTrade
@@ -40,6 +41,7 @@ async def trade(message, bybit_session):
         bybit_session.create_perp_orders_bulk(orders, order_type='Market')
 
     except Exception as e:
+        print(traceback.format_exc())
         print(e)
         print(f"Failed to create an order for signal {message}")
         pass
@@ -78,6 +80,7 @@ def main():
     sess = BybitTrade(
         args.bybit_api_key, 
         args.bybit_api_secret, 
+        APPROVED_SYMBOLS,
         amount=args.amount, 
         take_profit=args.take_profit, 
         stop_loss=args.stop_loss,
