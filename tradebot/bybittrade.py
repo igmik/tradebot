@@ -8,7 +8,7 @@ class BybitTrade:
             take_profit:int=4,
             stop_loss:int=4,
             open_policy:bool=False,
-            close_policy:bool=False,
+            close_policy:int=0,
         ):
         self.session = usdt_perpetual.HTTP(
             endpoint='https://api.bybit.com', 
@@ -70,21 +70,24 @@ class BybitTrade:
             side = order['side']
             position = self.get_active_position(positions, symbol)
             if position:
-                if position['unrealised_pnl'] > 0.2:
-                    print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
-                    self.session.close_position(symbol)
-                else:
-                    if position['side'] == side:
+                if position['side'] == side:
+                    if self.close_policy == 1 and position['unrealised_pnl'] > 0.2:
+                        print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
+                        self.session.close_position(symbol)
+                    else:
                         print(f"{side} order for {symbol} is already open")
                         continue
+                else:
+                    if self.close_policy == 0 and not self.open_policy:
+                        print(f"{symbol} is open for {position['side']}, but requested for {side}. Ignore.")
+                        continue
+                    elif self.close_policy == 1 and position['unrealised_pnl'] > 0.2:
+                        print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
+                        self.session.close_position(symbol)
+                    elif self.close_policy == 2:
+                        print(f"{symbol} is open for {position['side']}, but requested for {side}. Closing.")
+                        self.session.close_position(symbol)
                     else:
-                        print(f"{symbol} is open for {position['side']}, but requested for {side}")
-                        if self.close_policy:
-                            print("Close in accordance with close_policy")
-                            self.session.close_position(symbol)
-                        if not self.open_policy:
-                            print("Do not open opposite in accordance with open_policy")
-                            continue
                         print("Open opposite position")
 
             if 'amount' in order:

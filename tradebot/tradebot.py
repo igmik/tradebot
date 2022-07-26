@@ -3,6 +3,7 @@ import traceback
 import re
 from telethon.sync import TelegramClient, events
 from bybittrade import BybitTrade
+import sys
 
 REGEX_SIGNAL_PATTERN = r'(^\w+).*(BUY|SELL)\s*$' # We expect messages like "BTCUSDT: [0.48500952 0.51499045] BUY"
 APPROVED_SYMBOLS = {
@@ -73,9 +74,13 @@ def main():
         help="Amount of USDT to be used in a single order including leverage. Default is 100. (i.e amount of 100 USDT with default 10x leverage will use 10 USDT of your derivative account)")
     parser.add_argument('--take_profit', type=int, default=4, help="Take profit in percent from the purchase price. Default is 4.")
     parser.add_argument('--stop_loss', type=int, default=4, help="Stop loss in percent from the purchase price. Default is 4.")
-    parser.add_argument('--close_policy', type=bool, default=False, help="Close active position if new signal shows opposite side (BUY or SELL). Default is False.")
+    parser.add_argument('--close_policy', type=int, default=0, help="Closing policy for active position: 0 - Do not close  if new signal shows opposite side (BUY or SELL); 1 - Close if current position shows profit > 0.2 USDT and reopen; 2 - Always close current position if new signal shows opposite side. Default is 0.")
     parser.add_argument('--open_policy', type=bool, default=False, help="Open new position on opposite side (BUY or SELL) when there is already an active one. Default is False.")
     args = parser.parse_args()
+    if args.close_policy not in range(3):
+        print(f"Wrong value for --close_policy: {args.close_policy}")
+        parser.print_help()
+        sys.exit(1)
 
     sess = BybitTrade(
         args.bybit_api_key, 
