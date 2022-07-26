@@ -35,8 +35,7 @@ options:
   --stop_loss STOP_LOSS
                         Stop loss in percent from the purchase price. Default is 4.
   --close_policy CLOSE_POLICY
-                        Close active position if new signal shows opposite side (BUY or SELL). Default is
-                        False.
+                        Closing policy for active position: 0 - Do not close  if new signal shows opposite side (BUY or SELL); 1 - Close if current position shows profit > 0.2 USDT and reopen; 2 - Always close current position if new signal shows opposite side. Default is 0.
   --open_policy OPEN_POLICY
                         Open new position on opposite side (BUY or SELL) when there is already an active one.
                         Default is False.
@@ -50,28 +49,49 @@ docker run -it tradebot tradebot.py  --telegram_api_id [your API id on telegram]
 The bot will be open `Market` USDT Perpetual orders using the default `10x` leverage in the quantity of specified USDT amount, i.e amount of 100 USDT with default 10x leverage will use 10 USDT of your derivative account. Default amount is 100 USDT. Also the default take_profit and stop_loss of 4% from the order price will be set. You can change these values to any other in the command line arguments on submission.
 
 ## Specific behaviour
-Before openning a new order bot will check if this symbol is currently an active position and if the requested order side (Buy or Sell) is the same it will ignore current signal:
+Before openning a new order bot will check if this symbol is currently an active position and if the requested order side (Buy or Sell) is the same or not. Then it will check different policies and will do the following:
+
+if the order side is the same:
+
+
+if `close_policy` is not 1 it will do nothing.
 ```
 Received at 2022-06-21 09:27:06+00:00:
 BTCUSDT: [0.50497186 0.49502817] SELL
 Sell order for BTCUSDT is already open
 ```
 
-If the order side is opposite, it will follow open and close policy.  
-If `close_policy` is set to True (default is False) it will close current position:
+if `close_policy` is 1 and the unrealized pnl is more than 0.2 USDT it will close current profitable position and open new one.
+```
+Received at 2022-07-26 20:00:13+00:00:
+XMRUSDT: [0.52311885 0.47688112] BUY
+Close Buy XMRUSDT position with 0.4112 profit
+{'symbol': 'XMRUSDT', 'side': 'Buy', 'price': 147.55, 'qty': 0.16266, 'stop_loss': 141.65, 'take_profit': 153.5, 'order_type': 'Market'}
+```
+
+If the order side is opposite:
+
+
+If `close_policy` is 0 and `open_policy` is False it will do nothing.
+```
+Received at 2022-07-26 20:00:07+00:00:
+TRXUSDT: [0.48888397 0.51111597] SELL
+TRXUSDT is open for Buy, but requested for Sell. Ignore.
+```
+
+if `close_policy` is 1 and the unrealized pnl is more than 0.2 USDT it will close current profitable position and open new one.
+```
+Received at 2022-07-24 20:00:06+00:00:
+EOSUSDT: [0.507445   0.49255502] BUY
+Close Sell EOSUSDT position with 0.2925 profit
+{'symbol': 'EOSUSDT', 'side': 'Buy', 'price': 1.21, 'qty': 19.83471, 'stop_loss': 1.162, 'take_profit': 1.259, 'order_type': 'Market'}
+```
+
+if `close_policy` is set to 2 it will close current position and open new one:
 ```
 Received at 2022-06-20 08:00:19+00:00:
 XLMUSDT: [0.50070024 0.49929973] BUY
-XLMUSDT is open for Sell, but requested for Buy
-Close in accordance with close_policy
-```
-
-If `open_policy` is set to False (default is False) it wont open new opposite position:
-```
-Received at 2022-06-20 08:00:17+00:00:
-BTCUSDT: [0.50497186 0.49502817] BUY
-BTCUSDT is open for Sell, but requested for Buy
-Do not open opposite in accordance with open_policy
+XLMUSDT is open for Sell, but requested for Buy. Closing.
 ```
 
 In case of an error in any REST API call the current order will be skipped:
