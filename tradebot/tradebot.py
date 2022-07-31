@@ -4,6 +4,7 @@ import re
 from telethon.sync import TelegramClient, events
 from bybittrade import BybitTrade
 import sys
+import demoji
 
 REGEX_SIGNAL_PATTERN = r'(^\w+).*(BUY|SELL)\s*$' # We expect messages like "BTCUSDT: [0.48500952 0.51499045] BUY"
 APPROVED_SYMBOLS = {
@@ -53,11 +54,12 @@ def listen_telegram(api_id, api_hash, bybit_session, input_channel):
     with TelegramClient('Listen', api_id, api_hash) as client:
         @client.on(events.NewMessage(chats=[input_channel]))
         async def channel_listener(event):
-            message = event.message
+            response = event.message
+            message = demoji.replace(response.message, '')
             print()
-            print(f"Received at {str(message.date)}:")
-            print(message.message)
-            asyncio.create_task(trade(message.message, bybit_session))
+            print(f"Received at {str(response.date)}:")
+            print(message)
+            asyncio.create_task(trade(message, bybit_session))
 
         client.run_until_disconnected()
 
