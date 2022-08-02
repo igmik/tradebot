@@ -1,7 +1,10 @@
 import asyncio
+import traceback
 import re
 from telethon.sync import TelegramClient, events
 from bybittrade import BybitTrade
+import sys
+import demoji
 
 REGEX_SIGNAL_PATTERN = r'(^\w+).*(BUY|SELL)\s*$' # We expect messages like "BTCUSDT: [0.48500952 0.51499045] BUY"
 APPROVED_SYMBOLS = {
@@ -40,6 +43,7 @@ async def trade(message, bybit_session):
         bybit_session.create_perp_orders_bulk(orders, order_type='Market')
 
     except Exception as e:
+        print(traceback.format_exc())
         print(e)
         print(f"Failed to create an order for signal {message}")
         pass
@@ -50,11 +54,12 @@ def listen_telegram(api_id, api_hash, bybit_session, input_channel):
     with TelegramClient('Listen', api_id, api_hash) as client:
         @client.on(events.NewMessage(chats=[input_channel]))
         async def channel_listener(event):
-            message = event.message
+            response = event.message
+            message = demoji.replace(response.message, '')
             print()
-            print(f"Received at {str(message.date)}:")
-            print(message.message)
-            asyncio.create_task(trade(message.message, bybit_session))
+            print(f"Received at {str(response.date)}:")
+            print(message)
+            asyncio.create_task(trade(message, bybit_session))
 
         client.run_until_disconnected()
 
@@ -71,13 +76,18 @@ def main():
         help="Amount of USDT to be used in a single order including leverage. Default is 100. (i.e amount of 100 USDT with default 10x leverage will use 10 USDT of your derivative account)")
     parser.add_argument('--take_profit', type=int, default=4, help="Take profit in percent from the purchase price. Default is 4.")
     parser.add_argument('--stop_loss', type=int, default=4, help="Stop loss in percent from the purchase price. Default is 4.")
-    parser.add_argument('--close_policy', type=bool, default=False, help="Close active position if new signal shows opposite side (BUY or SELL). Default is False.")
+    parser.add_argument('--close_policy', type=int, default=0, help="Closing policy for active position: 0 - Do not close  if new signal shows opposite side (BUY or SELL); 1 - Close if current position shows profit > 0.2 USDT and reopen; 2 - Always close current position if new signal shows opposite side. Default is 0.")
     parser.add_argument('--open_policy', type=bool, default=False, help="Open new position on opposite side (BUY or SELL) when there is already an active one. Default is False.")
     args = parser.parse_args()
+    if args.close_policy not in range(3):
+        print(f"Wrong value for --close_policy: {args.close_policy}")
+        parser.print_help()
+        sys.exit(1)
 
     sess = BybitTrade(
         args.bybit_api_key, 
         args.bybit_api_secret, 
+        APPROVED_SYMBOLS,
         amount=args.amount, 
         take_profit=args.take_profit, 
         stop_loss=args.stop_loss,

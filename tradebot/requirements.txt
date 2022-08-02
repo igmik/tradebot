@@ -2,3 +2,4 @@ python-telegram-bot==20.0a1
 asyncio
 telethon
 pybit
+demoji
