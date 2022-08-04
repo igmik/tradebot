@@ -81,9 +81,13 @@ class BybitTrade:
                     if self.close_policy == 0 and not self.open_policy:
                         print(f"{symbol} is open for {position['side']}, but requested for {side}. Ignore.")
                         continue
-                    elif self.close_policy == 1 and position['unrealised_pnl'] > 0.2:
-                        print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
-                        self.session.close_position(symbol)
+                    elif self.close_policy == 1:
+                        if position['unrealised_pnl'] > 0.2:
+                            print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
+                            self.session.close_position(symbol)
+                        else:
+                            print(f"{symbol} is open for {position['side']}, but requested for {side}. Ignore.")
+                            continue
                     elif self.close_policy == 2:
                         print(f"{symbol} is open for {position['side']}, but requested for {side}. Closing.")
                         self.session.close_position(symbol)
