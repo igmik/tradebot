@@ -1,0 +1,17 @@
+endpoint: "https://api.bybit.com"
+trade_type: "usdt_perpetual"
+regex: '(^\w+).*(BUY|SELL)\s*$'
+logfile: "tradebot.log"
+
+symbols:
+  BTCUSDT:
+    multiplier: 0.1
+    buy_leverage: 1
+    sell_leverage: 1
+    close_policy: 1
+
+  ETHUSDT:
+    multiplier: 1.0
+    buy_leverage: 1.5
+    sell_leverage: 1.5
+    target_profit: 0.2
