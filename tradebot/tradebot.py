@@ -6,6 +6,7 @@ import demoji
 import yaml
 from bybittrade import BybitTrade
 from symbol import Symbol
+from watchdog_utils import start_config_watchdog
 
 REGEX_SIGNAL_PATTERN = r'(^\w+).*(BUY|SELL)\s*$' # We expect messages like "BTCUSDT: [0.48500952 0.51499045] BUY"
 
@@ -79,6 +80,8 @@ def main():
         endpoint=endpoint, 
         trade_type=trade_type,
     )
+
+    start_config_watchdog(config_file, sess)
 
     listen_telegram(args.telegram_api_id, args.telegram_api_hash, bybit_session=sess, input_channel=args.telegram_channel)
 
