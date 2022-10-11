@@ -2,12 +2,27 @@ import asyncio
 import traceback
 import re
 from telethon.sync import TelegramClient, events
-import demoji
-import yaml
 from bybittrade import BybitTrade
-from symbol import Symbol
+import sys
+import demoji
 
 REGEX_SIGNAL_PATTERN = r'(^\w+).*(BUY|SELL)\s*$' # We expect messages like "BTCUSDT: [0.48500952 0.51499045] BUY"
+APPROVED_SYMBOLS = {
+    'TRXUSDT',
+    'BTCUSDT',
+    'ETHUSDT',
+    'ADAUSDT',
+    'XMRUSDT',
+    'BNBUSDT',
+    'XRPUSDT',
+    'LINKUSDT',
+    'ETCUSDT',
+    'DASHUSDT',
+    'EOSUSDT',
+    'LTCUSDT',
+    'ZECUSDT',
+    'XLMUSDT',
+}
 
 
 async def trade(message, bybit_session):
@@ -18,18 +33,19 @@ async def trade(message, bybit_session):
         
         symbol, side = m.group(1).upper(), m.group(2).upper()
 
-        if symbol not in bybit_session.symbols:
+        if symbol not in APPROVED_SYMBOLS:
             raise ValueError(f"Symbol {symbol} is not in the list of approved symbols")
         if side not in {'SELL', 'BUY'}:
             raise ValueError(f"Side {side} must be either BUY or SELL")
 
         side = 'Buy' if side == 'BUY' else 'Sell'
-        bybit_session.create_perp_order(symbol, side)
+        orders = [{'symbol': symbol, 'side': side}]
+        bybit_session.create_perp_orders_bulk(orders, order_type='Market')
 
     except Exception as e:
         print(traceback.format_exc())
         print(e)
-        print(f"Failed to execute order for signal {message}")
+        print(f"Failed to create an order for signal {message}")
         pass
 
     return
@@ -40,7 +56,7 @@ def listen_telegram(api_id, api_hash, bybit_session, input_channel):
         async def channel_listener(event):
             response = event.message
             message = demoji.replace(response.message, '')
-            message = message.encode("ascii", "ignore").decode()
+            print()
             print(f"Received at {str(response.date)}:")
             print(message)
             asyncio.create_task(trade(message, bybit_session))
@@ -56,28 +72,27 @@ def main():
     parser.add_argument('--bybit_api_key', required=True, type=str, default=None, help="API key id for Bybit.")
     parser.add_argument('--bybit_api_secret', required=True, type=str, default=None, help="API secret hash for Bybit.")
     parser.add_argument('--telegram_channel', required=True, type=int, default=None, help="ID of telegram channel with signals.")
-    parser.add_argument('--config', required=True, type=str, default=None, help="Path to config.yaml file.")
+    parser.add_argument('--amount', type=int, default=100, 
+        help="Amount of USDT to be used in a single order including leverage. Default is 100. (i.e amount of 100 USDT with default 10x leverage will use 10 USDT of your derivative account)")
+    parser.add_argument('--take_profit', type=int, default=4, help="Take profit in percent from the purchase price. Default is 4.")
+    parser.add_argument('--stop_loss', type=int, default=4, help="Stop loss in percent from the purchase price. Default is 4.")
+    parser.add_argument('--close_policy', type=int, default=0, help="Closing policy for active position: 0 - Do not close  if new signal shows opposite side (BUY or SELL); 1 - Close if current position shows profit > 0.2 USDT and reopen; 2 - Always close current position if new signal shows opposite side. Default is 0.")
+    parser.add_argument('--open_policy', type=bool, default=False, help="Open new position on opposite side (BUY or SELL) when there is already an active one. Default is False.")
     args = parser.parse_args()
-
-    config_file = args.config
-    with open(config_file, "r") as file:
-        config = yaml.safe_load(file)
-    
-    print(f"Apply config {config_file}:\n{yaml.dump(config, indent=4)}")
-    
-    ref = config.get('global_reference', None)
-    endpoint = config.get('endpoint', 'https://api-testnet.bybit.com')
-    global REGEX_SIGNAL_PATTERN
-    REGEX_SIGNAL_PATTERN = config.get('regex', re.compile(r'(^\w+).*(BUY|SELL)\s*$'))
-    trade_type = config.get('trade_type', 'usdt_perpetual')
-    symbols = {symbol_name: Symbol(symbol_name, symbol_config, ref=ref) for symbol_name, symbol_config in config['symbols'].items()}
+    if args.close_policy not in range(3):
+        print(f"Wrong value for --close_policy: {args.close_policy}")
+        parser.print_help()
+        sys.exit(1)
 
     sess = BybitTrade(
         args.bybit_api_key, 
         args.bybit_api_secret, 
-        symbols,
-        endpoint=endpoint, 
-        trade_type=trade_type,
+        APPROVED_SYMBOLS,
+        amount=args.amount, 
+        take_profit=args.take_profit, 
+        stop_loss=args.stop_loss,
+        open_policy=args.open_policy,
+        close_policy=args.close_policy,
     )
 
     listen_telegram(args.telegram_api_id, args.telegram_api_hash, bybit_session=sess, input_channel=args.telegram_channel)
