@@ -52,13 +52,15 @@ class BybitTrade:
             side = 'Buy'
         return float(res['result'][0]['price']) if side == "Buy" else float(res['result'][1]['price'])
 
-    def _apply_close_policy_1(self, position, symbol, target_profit=0.2):
+    def _apply_close_policy_1(self, position, symbol, target_profit=0.2, **kwargs):
+        _ = kwargs
         if position['unrealised_pnl'] > target_profit:
             print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
             return self.session.close_position(symbol)
         return None
     
-    def _apply_close_policy_2(self, position, symbol, side):
+    def _apply_close_policy_2(self, position, symbol, side, **kwargs):
+        _ = kwargs
         if position['side'] != side:
             print(f"{symbol} is open for {position['side']}, but requested for {side}. Closing.")
             return self.session.close_position(symbol)
@@ -173,7 +175,7 @@ class BybitTrade:
             position = self.get_active_position(self.current_positions(), symbol)
             closed = self._apply_close_policy(close_policy, position, symbol=symbol, side=side, target_profit=target_profit) if close_policy else None
             if position and not closed and not open_policy:
-                print(f"{side} order for {symbol} is already open")
+                print(f"{position['side']} order for {symbol} is already open")
                 print('Skip')
                 return                  
 
@@ -196,7 +198,7 @@ class BybitTrade:
 
         tp, sl = None, None
         if sl_perc or tp_perc:
-            tp, sl = self.adjust_tpsl(side, symbol, price, tp_perc, sl_perc)
+            tp, sl = self.adjust_tpsl(symbol, side, price, tp_perc, sl_perc)
             tp = tp if tp_perc else None
             sl = sl if sl_perc else None
             order['stop_loss'] = sl
@@ -217,9 +219,10 @@ class BybitTrade:
                 reduce_only=False,
                 close_on_trigger=False,
             )
-            if resp['result'].get('orderId', None):
-                self.order_counter[side][symbol].append(resp['result'].get('orderId'))
-                print(f"Opened {symbol} for {side} with order ID {resp['result'].get('orderId')}")
+            if 'order_id' in resp['result'] or 'orderId' in resp['result']:
+                order_id = resp['result'].get('order_id') if 'order_id' in resp['result'] else resp['result'].get('orderId')
+                self.order_counter[side][symbol].append(order_id)
+                print(f"Opened {symbol} for {side} with order ID {order_id}")
         except Exception as e:
             print(f"Failed to create order: {order}")
             print(e)
