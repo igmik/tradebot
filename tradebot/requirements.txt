@@ -3,3 +3,5 @@ asyncio
 telethon
 pybit
 demoji
+pyyaml
+watchdog
