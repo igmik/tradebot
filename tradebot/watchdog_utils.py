@@ -1,9 +1,12 @@
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import yaml
+import logging
 from symbol import Symbol
 import os
 
+
+logger = logging.getLogger('tradebot.watchdog')
 
 class FsHandler(FileSystemEventHandler):
     def __init__(self, config_file, sess):
@@ -15,20 +18,20 @@ class FsHandler(FileSystemEventHandler):
         if self.config_file != event.src_path:
             return
 
-        print(f'{event.event_type}  file: {event.src_path}')
+        logger.info(f'{event.event_type}  file: {event.src_path}')
         try:
             with open(self.config_file, "r") as file:
                 config = yaml.safe_load(file)
             ref = config.get('global_reference', None)
             symbols = {symbol_name: Symbol(symbol_name, symbol_config, ref=ref) for symbol_name, symbol_config in config['symbols'].items()}
             self.sess.symbols = symbols
-            print(f"Apply new symbols config from {self.config_file}:\n{yaml.dump(config['symbols'], indent=4)}")
+            logger.info(f"Apply new symbols config from {self.config_file}:\n{yaml.dump(config['symbols'], indent=4)}")
 
         except Exception as e:
-            print(f"Failed to read and apply new config {self.config_file}")
-            print(e)
-            print('Skip.')
-            pass
+            logger.warning(f"Failed to read and apply new config {self.config_file}")
+            logger.warning(e)
+            logger.warning('Skip.')
+        pass
 
 def start_config_watchdog(config_file, sess):
     event_handler = FsHandler(config_file, sess)
