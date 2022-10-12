@@ -2,14 +2,32 @@ import asyncio
 import traceback
 import re
 from telethon.sync import TelegramClient, events
+import logging
+from datetime import datetime
 import demoji
 import yaml
 from bybittrade import BybitTrade
 from symbol import Symbol
 from watchdog_utils import start_config_watchdog
 
+logger = logging.getLogger('tradebot')
+
 REGEX_SIGNAL_PATTERN = r'(^\w+).*(BUY|SELL)\s*$' # We expect messages like "BTCUSDT: [0.48500952 0.51499045] BUY"
 
+
+def setup_logger(log_level, logfile):
+    log_formatter = logging.Formatter('%(asctime)s %(name)s [%(levelname)s] %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
+    logger.setLevel(log_level)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(log_formatter)
+    logger.addHandler(console_handler)
+
+    if logfile:
+        fileHandler = logging.FileHandler("{0}_{1}".format(logfile, datetime.utcnow().strftime('%F_%T.%f')[:-3]))
+        fileHandler.setLevel(log_level)
+        fileHandler.setFormatter(log_formatter)
+        logger.addHandler(fileHandler)
 
 async def trade(message, bybit_session):
     try:
@@ -28,9 +46,9 @@ async def trade(message, bybit_session):
         bybit_session.create_perp_order(symbol, side)
 
     except Exception as e:
-        print(traceback.format_exc())
-        print(e)
-        print(f"Failed to execute order for signal {message}")
+        logger.warning(traceback.format_exc())
+        logger.warning(e)
+        logger.warning(f"Failed to execute order for signal {message}")
         pass
 
     return
@@ -42,8 +60,8 @@ def listen_telegram(api_id, api_hash, bybit_session, input_channel):
             response = event.message
             message = demoji.replace(response.message, '')
             message = message.encode("ascii", "ignore").decode()
-            print(f"Received at {str(response.date)}:")
-            print(message)
+            logger.info(f"Received at {str(response.date)}:")
+            logger.info(message)
             asyncio.create_task(trade(message, bybit_session))
 
         client.run_until_disconnected()
@@ -63,8 +81,12 @@ def main():
     config_file = args.config
     with open(config_file, "r") as file:
         config = yaml.safe_load(file)
+
+    log_level = config.get('log_level', 'INFO').upper()
+    log_file = config.get('logfile', None)
+    setup_logger(log_level, log_file)
     
-    print(f"Apply config {config_file}:\n{yaml.dump(config, indent=4)}")
+    logger.info(f"Apply config {args.config}:\n{yaml.dump(config, indent=4)}")
     
     ref = config.get('global_reference', None)
     endpoint = config.get('endpoint', 'https://api-testnet.bybit.com')

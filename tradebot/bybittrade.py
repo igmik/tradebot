@@ -2,6 +2,7 @@ import math
 from symtable import Symbol
 from pybit import usdt_perpetual
 from collections import defaultdict
+import logging
 
 
 ENDPOINT = 'https://api-testnet.bybit.com'
@@ -13,6 +14,7 @@ class BybitTrade:
             trade_type:str='usdt_perpetual',
         ):
 
+        self.logger = logging.getLogger('tradebot.bybit')
         self.symbols = symbols
         self.trade_type = trade_type
         if trade_type == 'usdt_perpetual':
@@ -55,14 +57,14 @@ class BybitTrade:
     def _apply_close_policy_1(self, position, symbol, target_profit=0.2, **kwargs):
         _ = kwargs
         if position['unrealised_pnl'] > target_profit:
-            print(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
+            self.logger.info(f"Close {position['side']} {symbol} position with {position['unrealised_pnl']} profit")
             return self.session.close_position(symbol)
         return None
     
     def _apply_close_policy_2(self, position, symbol, side, **kwargs):
         _ = kwargs
         if position['side'] != side:
-            print(f"{symbol} is open for {position['side']}, but requested for {side}. Closing.")
+            self.logger.info(f"{symbol} is open for {position['side']}, but requested for {side}. Closing.")
             return self.session.close_position(symbol)
         return None
     
@@ -85,8 +87,8 @@ class BybitTrade:
                 sell_leverage=symbol.sell_leverage,
             )
         except Exception as e:
-            print(e)
-            print("Skip")
+            self.logger.warning(e)
+            self.logger.warning("Skip")
             pass
     
     def current_positions(self) -> list:
@@ -108,34 +110,34 @@ class BybitTrade:
             position = self.get_active_position(self.current_positions(), symbol)
             if position:
                 if position['side'] == side:
-                    print(f"Closing {symbol} for side {side}.")
+                    self.logger.info(f"Closing {symbol} for side {side}.")
                     self.session.close_position(symbol)
                 else:
-                    print(f"Position {symbol} for side {side} not found.")
-                    print("Skip.")
+                    self.logger.info(f"Position {symbol} for side {side} not found.")
+                    self.logger.info("Skip.")
             else:
-                print(f"Cannot close position {symbol} for side {side} as no opened positions.")
-                print("Skip.")
+                self.logger.info(f"Cannot close position {symbol} for side {side} as no opened positions.")
+                self.logger.info("Skip.")
         except Exception as e:
-            print(f"Failed to close order: {symbol} for side {side}.")
-            print(e)
-            print("Skip")
+            self.logger.warning(f"Failed to close order: {symbol} for side {side}.")
+            self.logger.warning(e)
+            self.logger.warning("Skip")
             pass  
     
     def close_last_order(self, symbol, side):
         try:
             if not self.order_counter[side][symbol]:
-                print(f"No active orders of {symbol} for side {side} to close")
-                print("Skip")
+                self.logger.warning(f"No active orders of {symbol} for side {side} to close")
+                self.logger.warning("Skip")
                 return
     
             order_id = self.order_counter[side][symbol].pop()
-            print(f"Closing {symbol} for side {side} with order {order_id}.")
+            self.logger.info(f"Closing {symbol} for side {side} with order {order_id}.")
             self.session.close_order(symbol=symbol, parentOrderId=order_id)
         except Exception as e:
-            print(f"Failed to close order: {symbol} for side {side} with order {order_id}.")
-            print(e)
-            print("Skip")
+            self.logger.warning(f"Failed to close order: {symbol} for side {side} with order {order_id}.")
+            self.logger.warning(e)
+            self.logger.warning("Skip")
             pass
     
     def adjust_tpsl(self, symbol, side, price, tp_perc, sl_perc):
@@ -175,8 +177,8 @@ class BybitTrade:
             position = self.get_active_position(self.current_positions(), symbol)
             closed = self._apply_close_policy(close_policy, position, symbol=symbol, side=side, target_profit=target_profit) if close_policy else None
             if position and not closed and not open_policy:
-                print(f"{position['side']} order for {symbol} is already open")
-                print('Skip')
+                self.logger.info(f"{position['side']} order for {symbol} is already open")
+                self.logger.info('Skip')
                 return                  
 
         if target_price:
@@ -204,7 +206,7 @@ class BybitTrade:
             order['stop_loss'] = sl
             order['take_profit'] = tp
         
-        print(order)
+        self.logger.debug(order)
 
         try:
             resp = self.session.place_active_order(
@@ -222,11 +224,11 @@ class BybitTrade:
             if 'order_id' in resp['result'] or 'orderId' in resp['result']:
                 order_id = resp['result'].get('order_id') if 'order_id' in resp['result'] else resp['result'].get('orderId')
                 self.order_counter[side][symbol].append(order_id)
-                print(f"Opened {symbol} for {side} with order ID {order_id}")
+                self.logger.info(f"Opened {symbol} for {side} with order ID {order_id}")
         except Exception as e:
-            print(f"Failed to create order: {order}")
-            print(e)
-            print("Skip")
+            self.logger.warning(f"Failed to create order: {order}")
+            self.logger.warning(e)
+            self.logger.warning("Skip")
             pass        
         
         return
