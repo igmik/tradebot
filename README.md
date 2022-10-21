@@ -1,4 +1,4 @@
-# **TRADEBOT**.
+# **TRADEBOT** overview
 A trading bot that will open orders on ByBit exchange based on the signals you receive in some Telegram channel.
 ```sh
 Received at 2022-06-21 08:00:03+00:00:
