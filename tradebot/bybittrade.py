@@ -27,6 +27,7 @@ class BybitTrade:
         )
         
         self.order_counter = {}
+        self.leverage_set = {}
         self.order_counter['Buy'] = defaultdict(list)
         self.order_counter['Sell'] = defaultdict(list)
         self._init_symbols(symbols)
@@ -81,11 +82,13 @@ class BybitTrade:
 
     def set_leverage(self, symbol:Symbol) -> None:
         try:
+            self.logger.info(f"For {symbol.name} set buy leverage to {symbol.buy_leverage} and sell leverage to {symbol.sell_leverage}")
             self.session.set_leverage(
                 symbol=symbol.name,
                 buy_leverage=symbol.buy_leverage,
                 sell_leverage=symbol.sell_leverage,
             )
+            self.leverage_set[symbol.name] = symbol
         except Exception as e:
             self.logger.warning(e)
             self.logger.warning("Skip")
@@ -205,6 +208,10 @@ class BybitTrade:
             sl = sl if sl_perc else None
             order['stop_loss'] = sl
             order['take_profit'] = tp
+
+        if symbol in self.leverage_set:
+            if self.leverage_set[symbol].buy_leverage != self.symbols[symbol].buy_leverage or self.leverage_set[symbol].sell_leverage != self.symbols[symbol].sell_leverage:
+               self.set_leverage(self.symbols[symbol])
         
         self.logger.debug(order)
 
